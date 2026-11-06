@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { Settings } from "./auth";
+import { finalizePicks, rankLooks } from "./match";
 
 export type Need = "have" | "buy" | "both";
 export type StyleForm = {
@@ -84,9 +85,10 @@ export function buildPrompt(opts: {
   mine: PastFeedback[];
 }) {
   const { settings, form, labels, kb, mine } = opts;
+  // Most relevant looks first, so the AI sees the best candidates even with a large knowledge base.
   const looks =
-    kb
-      .filter((k) => k.type === "look")
+    rankLooks(kb, form, labels)
+      .map((x) => x.l)
       .slice(0, 80)
       .map((l) => `- ${l.id} | ${l.title} | tags: ${l.tags || ""} | ${l.notes || ""}`)
       .join("\n") || "(none yet)";
@@ -156,7 +158,7 @@ THIS CLIENT'S OWN PAST FEEDBACK (adapt to it):
 ${mineTxt}
 
 Reply with ONLY a JSON object, no prose around it, in this shape:
-{"first_impression":"2-3 sentences","best_option":{"photo_number":<int or null>,"why":"..."},"photo_notes":[{"photo_number":1,"note":"short honest note"}],"outfit_styling":["..."],"accessories":["..."],"footwear_and_bag":["..."],"hair_and_makeup":["..."],"avoid":["..."],"shopping_list":["specific items to buy if needed, within budget"],"where_to_buy":[{"store":"store, market or website name","kind":"Online | In-store | Online & in-store","why":"what to look for there"}],"reference_look_ids":["ids from the reference looks that match, max 3"],"link_ids":["ids from the links that help, max 4"],"note_for_client":"one encouraging line"}
+{"first_impression":"2-3 sentences","best_option":{"photo_number":<int or null>,"why":"..."},"photo_notes":[{"photo_number":1,"note":"short honest note"}],"outfit_styling":["..."],"accessories":["..."],"footwear_and_bag":["..."],"hair_and_makeup":["..."],"avoid":["..."],"shopping_list":["specific items to buy if needed, within budget"],"where_to_buy":[{"store":"store, market or website name","kind":"Online | In-store | Online & in-store","why":"what to look for there"}],"reference_look_ids":["ids of the reference looks that best match this occasion, setting and the client's options (compare tags, title and notes), max 3; [] if none fit"],"link_ids":["ids from the links that help, max 4"],"note_for_client":"one encouraging line"}
 If photos were shared, base "best_option" and "photo_notes" on them; if not, set best_option.photo_number to null and photo_notes to [].
 ${buying ? "" : 'Set "where_to_buy" to [].'}
 Keep each list to 2-5 short bullet points.${buyingRules}`;
@@ -186,8 +188,8 @@ function sampleResult(form: StyleForm, labels: string[], kb: KbItem[]): StyleRes
             { store: "[TEST] An online ethnic-wear store that ships to you", kind: "Online", why: "Wider range of sizes and colours" },
           ]
         : [],
-    reference_look_ids: kb.filter((k) => k.type === "look").slice(0, 2).map((k) => k.id),
-    link_ids: kb.filter((k) => k.type === "link").slice(0, 1).map((k) => k.id),
+    reference_look_ids: [], // filled by keyword matching in finalizePicks
+    link_ids: [],
     note_for_client: "You're going to look wonderful!",
   };
 }
@@ -200,7 +202,7 @@ export async function runFirstLook(opts: {
   kb: KbItem[];
   mine: PastFeedback[];
 }): Promise<StyleResult> {
-  if (aiTestMode()) return sampleResult(opts.form, opts.labels, opts.kb);
+  if (aiTestMode()) return finalizePicks(sampleResult(opts.form, opts.labels, opts.kb), opts.kb, opts.form, opts.labels);
   const system = `You are the AI "first look" assistant for ${opts.settings.stylist_name}, a personal fashion stylist. A client wants help dressing well for an occasion.
 Use the stylist's knowledge base as your main guide to taste and rules. Where it doesn't cover something, use broadly accepted styling knowledge, including cultural dress norms for Indian weddings and other occasions.
 Be warm, specific and practical. Talk about the clothes and accessories; never criticise the person's body.
@@ -225,7 +227,7 @@ If the client wants to style what they have, recommend from their own options fi
   const text = msg.content.map((b) => (b.type === "text" ? b.text : "")).join("");
   const parsed = parseJSON(text);
   if (!parsed) throw new Error("The assistant replied in an unexpected format. Please try again.");
-  return parsed;
+  return finalizePicks(parsed, opts.kb, opts.form, opts.labels);
 }
 
 export async function distillLearnings(existing: string, lines: string[]) {
