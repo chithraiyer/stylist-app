@@ -26,6 +26,8 @@ You'll create four free accounts: **Supabase**, **Anthropic**, **Stripe**, **Ver
 5. Optional: **Authentication → Providers → Google** to allow "Continue with Google". Email sign-in links work without this.
 
 ### 2. Anthropic (the AI)
+> **Test mode:** you can skip this step at first. With `ANTHROPIC_API_KEY` empty, every first look returns a clearly marked sample answer, so you can test the whole flow (feedback, personal reviews, paywall) at no cost. Add the key later to switch on the real AI.
+
 1. Go to https://console.anthropic.com → **API Keys → Create key**, and copy it.
 2. Add a small amount of credit under **Billing**. Each first look costs a few cents.
 

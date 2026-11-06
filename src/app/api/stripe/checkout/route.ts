@@ -10,7 +10,7 @@ export async function POST() {
   if (!user) return NextResponse.json({ error: "Please sign in." }, { status: 401 });
   const profile = await getProfile(user.id, user.email);
   if (isMember(profile)) return NextResponse.json({ url: `${siteUrl()}/account` });
-  if (!process.env.STRIPE_PRICE_ID) return NextResponse.json({ error: "Payments are not set up yet." }, { status: 500 });
+  if (!process.env.STRIPE_PRICE_ID || !process.env.STRIPE_SECRET_KEY) return NextResponse.json({ error: "Payments are not set up yet." }, { status: 500 });
 
   let customer = profile.stripe_customer_id;
   if (!customer) {

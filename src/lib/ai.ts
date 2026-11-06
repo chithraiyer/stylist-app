@@ -121,6 +121,29 @@ Reply with ONLY a JSON object, no prose around it, in this shape:
 Keep each list to 2-5 short bullet points.`;
 }
 
+/** Test mode: no Anthropic key set (or AI_TEST_MODE=true) → return a sample answer without calling the AI. */
+export function aiTestMode() {
+  return !process.env.ANTHROPIC_API_KEY || process.env.AI_TEST_MODE === "true";
+}
+
+function sampleResult(form: StyleForm, labels: string[], kb: KbItem[]): StyleResult {
+  const n = labels.length;
+  return {
+    first_impression: `[TEST MODE: sample answer, not a real AI review] For a ${form.event.toLowerCase()} as a ${form.role.toLowerCase()} (${form.when.toLowerCase()}), you're on the right track. Let's make it polished and comfortable.`,
+    best_option: { photo_number: n ? 1 : null, why: n ? `Photo 1${labels[0] ? ` (${labels[0]})` : ""} suits the occasion best: the colour and weight feel right for the setting.` : "Go for a rich jewel tone with light embroidery." },
+    photo_notes: labels.map((l, i) => ({ photo_number: i + 1, note: `${l || `Option ${i + 1}`}: sample note for testing.` })),
+    outfit_styling: ["Drape the dupatta over one shoulder to show the embroidery", "Keep the silhouette structured and fitted at the waist"],
+    accessories: ["Statement earrings, so skip the necklace", "A few thin bangles on one wrist"],
+    footwear_and_bag: ["Embellished juttis or block heels for comfort", "A small potli bag in a matching tone"],
+    hair_and_makeup: ["Soft waves or a low bun with fresh flowers", "Defined eyes with a neutral lip"],
+    avoid: ["Wearing white or ivory head to toe", "Very heavy jewelry with a heavily embroidered outfit"],
+    shopping_list: form.budget ? [`Earrings within your budget (${form.budget})`] : ["Statement earrings"],
+    reference_look_ids: kb.filter((k) => k.type === "look").slice(0, 2).map((k) => k.id),
+    link_ids: kb.filter((k) => k.type === "link").slice(0, 1).map((k) => k.id),
+    note_for_client: "You're going to look wonderful!",
+  };
+}
+
 export async function runFirstLook(opts: {
   settings: Settings;
   form: StyleForm;
@@ -129,6 +152,7 @@ export async function runFirstLook(opts: {
   kb: KbItem[];
   mine: PastFeedback[];
 }): Promise<StyleResult> {
+  if (aiTestMode()) return sampleResult(opts.form, opts.labels, opts.kb);
   const system = `You are the AI "first look" assistant for ${opts.settings.stylist_name}, a personal fashion stylist. A client wants help dressing well for an occasion.
 Use the stylist's knowledge base as your main guide to taste and rules. Where it doesn't cover something, use broadly accepted styling knowledge, including cultural dress norms for Indian weddings and other occasions.
 Be warm, specific and practical. Talk about the clothes and accessories; never criticise the person's body. Recommend from the client's own options first, then suggest small additions.`;
@@ -156,6 +180,8 @@ Be warm, specific and practical. Talk about the clothes and accessories; never c
 }
 
 export async function distillLearnings(existing: string, lines: string[]) {
+  if (aiTestMode())
+    return `${existing ? existing + "\n" : ""}- [TEST MODE] Sample rule drafted from ${lines.length} feedback item(s). Add an Anthropic key for real learnings.`;
   const msg = await client().messages.create({
     model: MODEL(),
     max_tokens: 1200,
