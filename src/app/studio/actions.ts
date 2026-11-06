@@ -50,14 +50,44 @@ export async function addKb(f: FormData) {
   revalidatePath("/");
 }
 
-export async function updateGuide(f: FormData) {
+/** Edit any knowledge-base item. Looks can also get a new photo. */
+export async function updateKb(f: FormData) {
   await requireStylist();
+  const admin = createAdmin();
   const id = str(f, "id", 64);
+  const { data: item } = await admin.from("kb_items").select("type,image_path").eq("id", id).maybeSingle();
+  if (!item) return;
   const title = str(f, "title", 200);
-  const body = str(f, "body", 20000);
-  if (!id || !title || !body) return;
-  await createAdmin().from("kb_items").update({ title, body }).eq("id", id).eq("type", "guide");
+  if (!title) return;
+  const row: Record<string, unknown> = { title };
+  if (item.type === "look") {
+    row.tags = str(f, "tags", 300) || null;
+    row.notes = str(f, "notes", 2000) || null;
+    const img = f.get("image");
+    if (img instanceof File && img.size) {
+      const ext = img.type === "image/png" ? "png" : img.type === "image/webp" ? "webp" : "jpg";
+      const path = `${crypto.randomUUID()}.${ext}`;
+      const { error } = await admin.storage
+        .from("kb-images")
+        .upload(path, Buffer.from(await img.arrayBuffer()), { contentType: img.type || "image/jpeg" });
+      if (error) throw new Error("Could not upload the photo.");
+      row.image_path = path;
+      if (item.image_path) await admin.storage.from("kb-images").remove([item.image_path]);
+    }
+  } else if (item.type === "guide") {
+    const body = str(f, "body", 20000);
+    if (!body) return;
+    row.body = body;
+  } else if (item.type === "link") {
+    const url = str(f, "url", 1000);
+    if (!/^https?:\/\//.test(url)) return;
+    row.url = url;
+    row.region = str(f, "region", 60) || "Anywhere";
+    row.notes = str(f, "notes", 2000) || null;
+  }
+  await admin.from("kb_items").update(row).eq("id", id);
   revalidatePath("/studio/kb");
+  revalidatePath("/");
 }
 
 export async function deleteKb(f: FormData) {

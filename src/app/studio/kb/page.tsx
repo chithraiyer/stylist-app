@@ -1,6 +1,6 @@
 import { createAdmin } from "@/lib/supabase/server";
 import { kbImageUrl } from "@/lib/photos";
-import { addKb, deleteKb, updateGuide } from "../actions";
+import { addKb, deleteKb, updateKb } from "../actions";
 import SubmitButton from "@/components/SubmitButton";
 
 export default async function KnowledgeBase() {
@@ -71,7 +71,18 @@ export default async function KnowledgeBase() {
               <div className="meta">
                 <b>{l.title}</b>
                 <span className="muted">{l.tags}</span>
-                {l.notes && <div className="small" style={{ margin: "4px 0" }}>{l.notes}</div>}
+                {l.notes && <div className="small" style={{ margin: "4px 0", whiteSpace: "pre-wrap" }}>{l.notes}</div>}
+                <details style={{ margin: "6px 0" }}>
+                  <summary className="small" style={{ cursor: "pointer", color: "var(--maroon)" }}>Edit</summary>
+                  <form action={updateKb} style={{ marginTop: 8 }}>
+                    <input type="hidden" name="id" value={l.id} />
+                    <div className="field"><label>Title</label><input type="text" name="title" defaultValue={l.title} required /></div>
+                    <div className="field"><label>Tags</label><input type="text" name="tags" defaultValue={l.tags || ""} /></div>
+                    <div className="field"><label>Styling notes</label><textarea name="notes" defaultValue={l.notes || ""} /></div>
+                    <div className="field"><label>Replace photo (optional)</label><input type="file" name="image" accept="image/jpeg,image/png,image/webp" /></div>
+                    <SubmitButton>Save changes</SubmitButton>
+                  </form>
+                </details>
                 <Remove id={l.id} />
               </div>
             </div>
@@ -90,7 +101,7 @@ export default async function KnowledgeBase() {
             <div className="small muted" style={{ whiteSpace: "pre-wrap", marginTop: 6 }}>{g.body}</div>
             <details style={{ marginTop: 8 }}>
               <summary className="small" style={{ cursor: "pointer", color: "var(--maroon)" }}>Edit</summary>
-              <form action={updateGuide} style={{ marginTop: 8 }}>
+              <form action={updateKb} style={{ marginTop: 8 }}>
                 <input type="hidden" name="id" value={g.id} />
                 <div className="field"><label>Title</label><input type="text" name="title" defaultValue={g.title} required /></div>
                 <div className="field"><label>Content</label><textarea name="body" defaultValue={g.body || ""} required style={{ minHeight: 200 }} /></div>
@@ -114,6 +125,19 @@ export default async function KnowledgeBase() {
               <Remove id={l.id} />
             </div>
             {l.notes && <div className="small muted">{l.notes}</div>}
+            <details style={{ marginTop: 8 }}>
+              <summary className="small" style={{ cursor: "pointer", color: "var(--maroon)" }}>Edit</summary>
+              <form action={updateKb} style={{ marginTop: 8 }}>
+                <input type="hidden" name="id" value={l.id} />
+                <div className="grid2">
+                  <div className="field"><label>Title</label><input type="text" name="title" defaultValue={l.title} required /></div>
+                  <div className="field"><label>URL</label><input type="url" name="url" defaultValue={l.url || ""} required /></div>
+                  <div className="field"><label>Region it serves</label><input type="text" name="region" list="regions" defaultValue={l.region || "Anywhere"} /></div>
+                  <div className="field"><label>Note</label><input type="text" name="notes" defaultValue={l.notes || ""} /></div>
+                </div>
+                <SubmitButton>Save changes</SubmitButton>
+              </form>
+            </details>
           </div>
         ))}
       </div>
