@@ -38,10 +38,22 @@ export async function POST(req: Request) {
     when: clean(form.when, 80),
     budget: clean(form.budget, 120),
     ask: clean(form.ask, 2000),
+    need: form.need === "buy" || form.need === "both" ? form.need : "have",
+    location: clean(form.location, 120),
+    shop_mode: ["Online", "In-store", "Either"].includes(String(form.shop_mode)) ? String(form.shop_mode) : "Either",
+    looking_for: Array.isArray(form.looking_for) ? form.looking_for.slice(0, 10).map((x) => clean(x, 40)) : [],
   };
+  if (form.need === "have") {
+    delete form.location;
+    delete form.shop_mode;
+    delete form.looking_for;
+  }
   const files = fd.getAll("photos").filter((f): f is File => f instanceof File);
   if (files.length > MAX_PHOTOS) return NextResponse.json({ error: `Up to ${MAX_PHOTOS} photos.` }, { status: 400 });
-  if (!files.length && !form.ask) return NextResponse.json({ error: "Add a photo or describe what you need." }, { status: 400 });
+  if (form.need !== "have" && !form.location)
+    return NextResponse.json({ error: "Tell us where you are so we can suggest places to shop." }, { status: 400 });
+  if (!files.length && !form.ask && !form.looking_for?.length)
+    return NextResponse.json({ error: "Add a photo or describe what you need." }, { status: 400 });
   for (const f of files) {
     if (!TYPES.includes(f.type as ImgType)) return NextResponse.json({ error: "Photos must be JPG, PNG or WebP." }, { status: 400 });
     if (f.size > MAX_BYTES) return NextResponse.json({ error: "Each photo must be under 5 MB." }, { status: 400 });
@@ -70,7 +82,7 @@ export async function POST(req: Request) {
 
   // 2. Context for the AI: knowledge base, shared learnings, this client's own feedback
   const [{ data: kb }, { data: fb }] = await Promise.all([
-    admin.from("kb_items").select("id,type,title,tags,notes,body,url,image_path").order("created_at", { ascending: false }),
+    admin.from("kb_items").select("id,type,title,tags,notes,body,url,image_path,region").order("created_at", { ascending: false }),
     admin
       .from("feedback")
       .select("rating,comment,sessions(form,result)")
@@ -121,7 +133,7 @@ export async function POST(req: Request) {
       .map((k) => ({ id: k.id, title: k.title, tags: k.tags, image_url: kbImageUrl(k.image_path) })),
     links: kbList
       .filter((k) => k.type === "link" && result.link_ids?.includes(k.id))
-      .map((k) => ({ id: k.id, title: k.title, url: k.url, notes: k.notes })),
+      .map((k) => ({ id: k.id, title: k.title, url: k.url, notes: k.notes, region: k.region ?? null })),
   });
 }
 

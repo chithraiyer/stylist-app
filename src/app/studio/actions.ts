@@ -31,6 +31,7 @@ export async function addKb(f: FormData) {
     body: str(f, "body", 20000) || null,
     url: str(f, "url", 1000) || null,
   };
+  if (type === "link") row.region = str(f, "region", 60) || "Anywhere";
   if (!row.title) return;
   if (type === "link" && !/^https?:\/\//.test(String(row.url || ""))) return;
   const img = f.get("image");

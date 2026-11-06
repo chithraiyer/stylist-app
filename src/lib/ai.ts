@@ -1,7 +1,26 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { Settings } from "./auth";
 
-export type StyleForm = { event: string; role: string; when: string; budget: string; ask: string };
+export type Need = "have" | "buy" | "both";
+export type StyleForm = {
+  event: string;
+  role: string;
+  when: string;
+  budget: string;
+  ask: string;
+  need?: Need; // style what I have / buy something new / both
+  location?: string; // city, country (only when buying)
+  shop_mode?: string; // Online / In-store / Either
+  looking_for?: string[]; // Outfit, Jewelry, Shoes, Bag, ...
+};
+
+export const NEED_LABEL: Record<Need, string> = {
+  have: "Style what I already have",
+  buy: "Help me buy something new",
+  both: "Both: style what I have and suggest what to add",
+};
+
+export type WhereToBuy = { store: string; kind: string; why: string };
 
 export type StyleResult = {
   first_impression?: string;
@@ -13,6 +32,7 @@ export type StyleResult = {
   hair_and_makeup?: string[];
   avoid?: string[];
   shopping_list?: string[];
+  where_to_buy?: WhereToBuy[];
   reference_look_ids?: string[];
   link_ids?: string[];
   note_for_client?: string;
@@ -27,6 +47,7 @@ export type KbItem = {
   body: string | null;
   url: string | null;
   image_path: string | null;
+  region?: string | null; // for links: "Anywhere", "USA", "India", ...
 };
 
 export type PastFeedback = { rating: string; comment: string | null; event?: string; summary?: string };
@@ -79,8 +100,25 @@ export function buildPrompt(opts: {
     kb
       .filter((k) => k.type === "link")
       .slice(0, 80)
-      .map((l) => `- ${l.id} | ${l.title} | ${l.url} | ${l.notes || ""}`)
+      .map((l) => `- ${l.id} | ${l.title} | region: ${l.region || "Anywhere"} | ${l.url} | ${l.notes || ""}`)
       .join("\n") || "(none yet)";
+  const need: Need = form.need || "have";
+  const buying = need !== "have";
+  const shopping = buying
+    ? `
+WHAT THEY WANT: ${NEED_LABEL[need]}
+Client location: ${form.location || "not given"}
+Shopping preference: ${form.shop_mode || "Either"}
+Looking to buy: ${form.looking_for?.length ? form.looking_for.join(", ") : "not specified"}`
+    : `
+WHAT THEY WANT: ${NEED_LABEL.have} (they are not planning to buy much; keep any shopping suggestions to small, optional additions)`;
+  const buyingRules = buying
+    ? `
+SHOPPING RULES:
+- "shopping_list" = specific items to buy (colour, fabric, style), within their budget.
+- "where_to_buy" = 3-6 places that serve the client's location: well-known stores, markets or neighbourhoods near them, and online stores that deliver there. Match their shopping preference. Only suggest places you are confident exist and serve that area; prefer well-established ones. Never invent store names, URLs or prices.
+- For "link_ids", choose only from the stylist's links whose region is "Anywhere" or matches the client's location. Prefer the stylist's links over your own suggestions.`
+    : "";
   const photoList = labels.length ? labels.map((l, i) => `Photo ${i + 1}: ${l || "(no label)"}`).join("\n") : "(no photos)";
   const mineTxt = mine.length
     ? mine
@@ -97,6 +135,7 @@ Attending as: ${form.role}
 Time & setting: ${form.when}
 Budget for new items: ${form.budget || "not given"}
 In their words: ${form.ask || "(nothing written)"}
+${shopping}
 
 CLIENT PHOTOS (${labels.length}, attached above in this order):
 ${photoList}
@@ -107,7 +146,7 @@ ${looks}
 STYLIST'S GUIDES:
 ${guides || "(none yet)"}
 
-STYLIST'S LINKS (id | title | url | note):
+STYLIST'S LINKS (id | title | region | url | note):
 ${links}
 
 LEARNINGS FROM PAST CLIENT FEEDBACK (anonymised, applies to everyone):
@@ -117,8 +156,10 @@ THIS CLIENT'S OWN PAST FEEDBACK (adapt to it):
 ${mineTxt}
 
 Reply with ONLY a JSON object, no prose around it, in this shape:
-{"first_impression":"2-3 sentences","best_option":{"photo_number":<int or null>,"why":"..."},"photo_notes":[{"photo_number":1,"note":"short honest note"}],"outfit_styling":["..."],"accessories":["..."],"footwear_and_bag":["..."],"hair_and_makeup":["..."],"avoid":["..."],"shopping_list":["specific items to buy if needed, within budget"],"reference_look_ids":["ids from the reference looks that match, max 3"],"link_ids":["ids from the links that help, max 3"],"note_for_client":"one encouraging line"}
-Keep each list to 2-5 short bullet points.`;
+{"first_impression":"2-3 sentences","best_option":{"photo_number":<int or null>,"why":"..."},"photo_notes":[{"photo_number":1,"note":"short honest note"}],"outfit_styling":["..."],"accessories":["..."],"footwear_and_bag":["..."],"hair_and_makeup":["..."],"avoid":["..."],"shopping_list":["specific items to buy if needed, within budget"],"where_to_buy":[{"store":"store, market or website name","kind":"Online | In-store | Online & in-store","why":"what to look for there"}],"reference_look_ids":["ids from the reference looks that match, max 3"],"link_ids":["ids from the links that help, max 4"],"note_for_client":"one encouraging line"}
+If photos were shared, base "best_option" and "photo_notes" on them; if not, set best_option.photo_number to null and photo_notes to [].
+${buying ? "" : 'Set "where_to_buy" to [].'}
+Keep each list to 2-5 short bullet points.${buyingRules}`;
 }
 
 /** Test mode: no Anthropic key set (or AI_TEST_MODE=true) → return a sample answer without calling the AI. */
@@ -138,6 +179,13 @@ function sampleResult(form: StyleForm, labels: string[], kb: KbItem[]): StyleRes
     hair_and_makeup: ["Soft waves or a low bun with fresh flowers", "Defined eyes with a neutral lip"],
     avoid: ["Wearing white or ivory head to toe", "Very heavy jewelry with a heavily embroidered outfit"],
     shopping_list: form.budget ? [`Earrings within your budget (${form.budget})`] : ["Statement earrings"],
+    where_to_buy:
+      form.need && form.need !== "have"
+        ? [
+            { store: `[TEST] A local Indian boutique near ${form.location || "you"}`, kind: "In-store", why: "Try outfits on and get alterations done" },
+            { store: "[TEST] An online ethnic-wear store that ships to you", kind: "Online", why: "Wider range of sizes and colours" },
+          ]
+        : [],
     reference_look_ids: kb.filter((k) => k.type === "look").slice(0, 2).map((k) => k.id),
     link_ids: kb.filter((k) => k.type === "link").slice(0, 1).map((k) => k.id),
     note_for_client: "You're going to look wonderful!",
@@ -155,7 +203,8 @@ export async function runFirstLook(opts: {
   if (aiTestMode()) return sampleResult(opts.form, opts.labels, opts.kb);
   const system = `You are the AI "first look" assistant for ${opts.settings.stylist_name}, a personal fashion stylist. A client wants help dressing well for an occasion.
 Use the stylist's knowledge base as your main guide to taste and rules. Where it doesn't cover something, use broadly accepted styling knowledge, including cultural dress norms for Indian weddings and other occasions.
-Be warm, specific and practical. Talk about the clothes and accessories; never criticise the person's body. Recommend from the client's own options first, then suggest small additions.`;
+Be warm, specific and practical. Talk about the clothes and accessories; never criticise the person's body.
+If the client wants to style what they have, recommend from their own options first, then suggest small additions. If they want to buy something new, recommend exactly what to look for and where they can buy it near them or online.`;
 
   const content: Anthropic.ContentBlockParam[] = [
     ...opts.images.map(
@@ -169,7 +218,7 @@ Be warm, specific and practical. Talk about the clothes and accessories; never c
 
   const msg = await client().messages.create({
     model: MODEL(),
-    max_tokens: 2000,
+    max_tokens: 2500,
     system,
     messages: [{ role: "user", content }],
   });

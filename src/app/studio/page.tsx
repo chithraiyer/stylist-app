@@ -37,6 +37,14 @@ export default async function Requests() {
                 {f.event} · {f.role} · {f.when}
                 {f.budget ? ` · budget: ${f.budget}` : ""} · {new Date(r.created_at).toLocaleString()}
               </div>
+              {f.need && f.need !== "have" && (
+                <p className="small">
+                  <b>{f.need === "buy" ? "Wants to buy something new" : "Styling + shopping"}</b>
+                  {f.location ? ` · ${f.location}` : ""}
+                  {f.shop_mode ? ` · shops ${String(f.shop_mode).toLowerCase()}` : ""}
+                  {f.looking_for?.length ? ` · looking for: ${f.looking_for.join(", ")}` : ""}
+                </p>
+              )}
               {f.ask && <p className="small"><b>Their question: </b>{f.ask}</p>}
               {r.message && <p className="small"><b>Why they asked you: </b>{r.message}</p>}
               <div className="mini big">

@@ -15,7 +15,7 @@ export default async function MyLooks() {
     admin.from("sessions").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(30),
     admin.from("review_requests").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
     admin.from("feedback").select("kind,session_id,request_id,rating,comment").eq("user_id", user.id),
-    admin.from("kb_items").select("id,type,title,tags,notes,url,image_path"),
+    admin.from("kb_items").select("id,type,title,tags,notes,url,image_path,region"),
   ]);
   const kbList = (kb || []) as KbItem[];
   const fbFor = (kind: string, id: string) => {
@@ -79,7 +79,7 @@ export default async function MyLooks() {
                   .map((k) => ({ id: k.id, title: k.title, tags: k.tags, image_url: kbImageUrl(k.image_path) }))}
                 links={kbList
                   .filter((k) => k.type === "link" && s.result?.link_ids?.includes(k.id))
-                  .map((k) => ({ id: k.id, title: k.title, url: k.url, notes: k.notes }))}
+                  .map((k) => ({ id: k.id, title: k.title, url: k.url, notes: k.notes, region: k.region ?? null }))}
                 stylistName={settings.stylist_name}
                 feedback={fbFor("ai", s.id)}
                 canAsk={!requested.has(s.id)}

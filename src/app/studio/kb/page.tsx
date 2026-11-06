@@ -47,6 +47,16 @@ export default async function KnowledgeBase() {
           <input type="hidden" name="type" value="link" />
           <div className="field" style={{ marginTop: 10 }}><label>Title</label><input type="text" name="title" required placeholder="e.g. Where to buy statement jhumkas" /></div>
           <div className="field"><label>URL</label><input type="url" name="url" required placeholder="https://…" /></div>
+          <div className="field">
+            <label>Region it serves</label>
+            <input type="text" name="region" list="regions" defaultValue="Anywhere" placeholder="e.g. USA, India, UK, Bay Area" />
+            <datalist id="regions">
+              {["Anywhere", "USA", "Canada", "UK", "India", "UAE", "Singapore", "Australia", "Bay Area", "Seattle", "New Jersey", "Chennai", "Mumbai", "Delhi", "Bangalore", "Hyderabad"].map((r) => (
+                <option key={r} value={r} />
+              ))}
+            </datalist>
+            <div className="small muted" style={{ marginTop: 4 }}>"Anywhere" for online stores that ship worldwide.</div>
+          </div>
           <div className="field"><label>Note</label><input type="text" name="notes" placeholder="Short note (optional)" /></div>
           <SubmitButton>Add link</SubmitButton>
         </form>
@@ -87,7 +97,13 @@ export default async function KnowledgeBase() {
         {!links.length && <div className="muted small">No links yet.</div>}
         {links.map((l) => (
           <div className="item" key={l.id}>
-            <div className="top"><a href={l.url} target="_blank" rel="noopener noreferrer">{l.title}</a><Remove id={l.id} /></div>
+            <div className="top">
+              <span>
+                <a href={l.url} target="_blank" rel="noopener noreferrer">{l.title}</a>
+                <span className="tag">{l.region || "Anywhere"}</span>
+              </span>
+              <Remove id={l.id} />
+            </div>
             {l.notes && <div className="small muted">{l.notes}</div>}
           </div>
         ))}

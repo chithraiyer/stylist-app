@@ -2,6 +2,14 @@
 import { useRef, useState } from "react";
 import Link from "next/link";
 import ResultCard, { type LinkRef, type LookRef, type SessionView } from "@/components/ResultCard";
+import type { Need } from "@/lib/ai";
+
+const NEEDS: { id: Need; title: string; sub: string }[] = [
+  { id: "have", title: "Style what I have", sub: "I have options and want help choosing and accessorizing" },
+  { id: "buy", title: "Help me buy something new", sub: "Tell me what to buy and where to find it near me" },
+  { id: "both", title: "Both", sub: "Style what I have and suggest what to add" },
+];
+const LOOKING_FOR = ["Outfit", "Jewelry", "Shoes", "Bag", "Dupatta / stole", "Hair accessories", "Everything"];
 
 type Photo = { blob: Blob; preview: string; label: string };
 
@@ -55,7 +63,10 @@ export default function StyleClient({
   left: number | null; // null = unlimited
 }) {
   const [left, setLeft] = useState(initialLeft);
-  const [form, setForm] = useState({ event: EVENTS[3], role: "Guest", when: "Evening, indoors", budget: "", ask: "" });
+  const [form, setForm] = useState({ event: EVENTS[3], role: "Guest", when: "Evening, indoors", budget: "", ask: "", location: "", shop_mode: "Either" });
+  const [need, setNeed] = useState<Need>("have");
+  const [lookingFor, setLookingFor] = useState<string[]>([]);
+  const buying = need !== "have";
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -81,12 +92,16 @@ export default function StyleClient({
 
   async function submit() {
     setErr("");
-    if (!photos.length && !form.ask.trim()) { setErr("Add at least one photo or describe what you need."); return; }
+    if (buying && !form.location.trim()) { setErr("Tell us where you are so we can suggest places to shop."); return; }
+    if (!photos.length && !form.ask.trim() && !(buying && lookingFor.length)) {
+      setErr(need === "have" ? "Add at least one photo of your options, or describe what you have." : "Choose what you're looking for, or describe it.");
+      return;
+    }
     if (left === 0) { setPaywall(true); return; }
     setBusy(true);
     setOut(null);
     const fd = new FormData();
-    fd.set("form", JSON.stringify(form));
+    fd.set("form", JSON.stringify(buying ? { ...form, need, looking_for: lookingFor } : { event: form.event, role: form.role, when: form.when, budget: form.budget, ask: form.ask, need }));
     fd.set("labels", JSON.stringify(photos.map((p) => p.label)));
     photos.forEach((p, i) => fd.append("photos", p.blob, `photo-${i + 1}.jpg`));
     try {
@@ -132,6 +147,17 @@ export default function StyleClient({
       </div>
 
       <div className="card">
+        <div className="field">
+          <label>What do you need?</label>
+          <div className="choices">
+            {NEEDS.map((n) => (
+              <button type="button" key={n.id} className={`choice ${need === n.id ? "on" : ""}`} onClick={() => setNeed(n.id)} aria-pressed={need === n.id}>
+                <b>{n.title}</b>
+                <span>{n.sub}</span>
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="grid2">
           <div className="field">
             <label>Occasion</label>
@@ -154,6 +180,40 @@ export default function StyleClient({
             <input type="text" placeholder="e.g. under $150 for accessories" value={form.budget} onChange={set("budget")} />
           </div>
         </div>
+        {buying && (
+          <div className="shopbox">
+            <div className="grid2">
+              <div className="field">
+                <label>Where are you? (city, country)</label>
+                <input type="text" placeholder="e.g. Seattle, USA · Chennai, India · London, UK" value={form.location} onChange={set("location")} />
+              </div>
+              <div className="field">
+                <label>How do you like to shop?</label>
+                <select value={form.shop_mode} onChange={set("shop_mode")}>
+                  <option>Either</option>
+                  <option>Online</option>
+                  <option>In-store</option>
+                </select>
+              </div>
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>What are you looking for?</label>
+              <div className="row">
+                {LOOKING_FOR.map((x) => (
+                  <button
+                    type="button"
+                    key={x}
+                    className={`chip ${lookingFor.includes(x) ? "on" : ""}`}
+                    aria-pressed={lookingFor.includes(x)}
+                    onClick={() => setLookingFor(lookingFor.includes(x) ? lookingFor.filter((y) => y !== x) : [...lookingFor, x])}
+                  >
+                    {x}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
         <div className="field">
           <label>What do you need help with?</label>
           <textarea
@@ -163,7 +223,11 @@ export default function StyleClient({
           />
         </div>
         <div className="field">
-          <label>Your options (up to 5 photos: outfits, jewelry, shoes, bags)</label>
+          <label>
+            {need === "buy"
+              ? "Photos (optional): pieces you already own that it should go with, or inspiration you like"
+              : "Your options (up to 5 photos: outfits, jewelry, shoes, bags)"}
+          </label>
           <div
             className={`drop ${over ? "over" : ""}`}
             onClick={() => fileRef.current?.click()}

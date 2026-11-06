@@ -4,7 +4,7 @@ import type { StyleForm, StyleResult } from "@/lib/ai";
 import Feedback, { type GivenFeedback } from "./Feedback";
 
 export type LookRef = { id: string; title: string; tags: string | null; image_url: string };
-export type LinkRef = { id: string; title: string; url: string | null; notes: string | null };
+export type LinkRef = { id: string; title: string; url: string | null; notes: string | null; region?: string | null };
 export type SessionView = {
   id: string;
   form: StyleForm;
@@ -51,6 +51,13 @@ export default function ResultCard({
         <div>
           <span className="pill">AI first look</span>
           <h3 style={{ marginTop: 6 }}>{session.form.event}</h3>
+          {session.form.need && session.form.need !== "have" && (
+            <div className="small muted">
+              {session.form.need === "buy" ? "Shopping for something new" : "Styling + shopping"}
+              {session.form.location ? ` · ${session.form.location}` : ""}
+              {session.form.shop_mode && session.form.shop_mode !== "Either" ? ` · ${session.form.shop_mode}` : ""}
+            </div>
+          )}
         </div>
         <span className="small muted">{new Date(session.created_at).toLocaleString()}</span>
       </div>
@@ -87,8 +94,23 @@ export default function ResultCard({
         <Bullets title="Footwear & bag" items={r.footwear_and_bag} />
         <Bullets title="Hair & makeup" items={r.hair_and_makeup} />
         <Bullets title="Avoid" items={r.avoid} />
-        <Bullets title="Shopping list" items={r.shopping_list} />
+        <Bullets title={session.form.need && session.form.need !== "have" ? "What to buy" : "Shopping list"} items={r.shopping_list} />
       </div>
+      {!!r.where_to_buy?.length && (
+        <div className="section">
+          <h4>Where to buy{session.form.location ? ` near ${session.form.location}` : ""}</h4>
+          <ul>
+            {r.where_to_buy.map((w, i) => (
+              <li key={i}>
+                <b>{w.store}</b>
+                {w.kind && <span className="tag">{w.kind}</span>}
+                {w.why ? ` · ${w.why}` : ""}
+              </li>
+            ))}
+          </ul>
+          <p className="small muted" style={{ margin: "6px 0 0" }}>Suggestions only. Check opening hours and stock before you go.</p>
+        </div>
+      )}
       {!!looks.length && (
         <div className="section">
           <h4>Similar looks by {stylistName}</h4>
@@ -107,11 +129,12 @@ export default function ResultCard({
       )}
       {!!links.length && (
         <div className="section">
-          <h4>Helpful links</h4>
+          <h4>{stylistName}'s picks</h4>
           <ul>
             {links.map((l) => (
               <li key={l.id}>
                 <a href={l.url || "#"} target="_blank" rel="noopener noreferrer">{l.title}</a>
+                {l.region && l.region !== "Anywhere" && <span className="tag">{l.region}</span>}
                 {l.notes ? ` · ${l.notes}` : ""}
               </li>
             ))}

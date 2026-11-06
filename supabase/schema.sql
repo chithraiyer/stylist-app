@@ -55,6 +55,8 @@ create table if not exists public.kb_items (
   image_path text,             -- in the public 'kb-images' bucket
   created_at timestamptz not null default now()
 );
+-- Region for shopping links, e.g. 'USA', 'India', 'Anywhere' (added in v1.1)
+alter table public.kb_items add column if not exists region text;
 
 -- ---------- A client's AI first look ----------
 create table if not exists public.sessions (

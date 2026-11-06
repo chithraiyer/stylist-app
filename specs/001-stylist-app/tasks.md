@@ -38,3 +38,11 @@
 - [ ] T062 Email notifications for new requests and replies
 - [ ] T063 Client self-service delete of looks and account
 - [ ] T064 PWA (installable on phones)
+
+## v1.1 — Shopping help by region
+- [x] T070 "What do you need?" choice: style what I have / buy something new / both
+- [x] T071 Shopping questions when buying: location (required), online/in-store, what they're looking for
+- [x] T072 Prompt + result: "What to buy" and "Where to buy near <location>" (no invented stores, URLs or prices)
+- [x] T073 Region tag on the stylist's links (`kb_items.region`); the AI picks only links matching the client's region or "Anywhere"
+- [x] T074 Shopping details shown on review requests in the studio
+- [ ] T075 Optional: live web search for current products and stores (Anthropic web search tool), behind a setting
