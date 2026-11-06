@@ -1,6 +1,6 @@
 import { createAdmin } from "@/lib/supabase/server";
 import { kbImageUrl } from "@/lib/photos";
-import { addKb, deleteKb } from "../actions";
+import { addKb, deleteKb, updateGuide } from "../actions";
 import SubmitButton from "@/components/SubmitButton";
 
 export default async function KnowledgeBase() {
@@ -39,7 +39,7 @@ export default async function KnowledgeBase() {
           <h3>Add a guide</h3>
           <input type="hidden" name="type" value="guide" />
           <div className="field" style={{ marginTop: 10 }}><label>Title</label><input type="text" name="title" required placeholder="e.g. Mehendi dos and don'ts" /></div>
-          <div className="field"><label>Content</label><textarea name="body" required style={{ minHeight: 160 }} placeholder="Your style rules, tips and knowledge…" /></div>
+          <div className="field"><label>Content</label><textarea name="body" required maxLength={20000} style={{ minHeight: 160 }} placeholder="Your style rules, tips and knowledge…" /></div>
           <SubmitButton>Add guide</SubmitButton>
         </form>
         <form className="card" action={addKb}>
@@ -87,7 +87,16 @@ export default async function KnowledgeBase() {
         {guides.map((g) => (
           <div className="item" key={g.id}>
             <div className="top"><b>{g.title}</b><Remove id={g.id} /></div>
-            <div className="small muted" style={{ whiteSpace: "pre-wrap" }}>{(g.body || "").slice(0, 500)}</div>
+            <div className="small muted" style={{ whiteSpace: "pre-wrap", marginTop: 6 }}>{g.body}</div>
+            <details style={{ marginTop: 8 }}>
+              <summary className="small" style={{ cursor: "pointer", color: "var(--maroon)" }}>Edit</summary>
+              <form action={updateGuide} style={{ marginTop: 8 }}>
+                <input type="hidden" name="id" value={g.id} />
+                <div className="field"><label>Title</label><input type="text" name="title" defaultValue={g.title} required /></div>
+                <div className="field"><label>Content</label><textarea name="body" defaultValue={g.body || ""} required style={{ minHeight: 200 }} /></div>
+                <SubmitButton>Save changes</SubmitButton>
+              </form>
+            </details>
           </div>
         ))}
       </div>

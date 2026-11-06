@@ -50,6 +50,16 @@ export async function addKb(f: FormData) {
   revalidatePath("/");
 }
 
+export async function updateGuide(f: FormData) {
+  await requireStylist();
+  const id = str(f, "id", 64);
+  const title = str(f, "title", 200);
+  const body = str(f, "body", 20000);
+  if (!id || !title || !body) return;
+  await createAdmin().from("kb_items").update({ title, body }).eq("id", id).eq("type", "guide");
+  revalidatePath("/studio/kb");
+}
+
 export async function deleteKb(f: FormData) {
   await requireStylist();
   const admin = createAdmin();

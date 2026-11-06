@@ -92,8 +92,8 @@ export function buildPrompt(opts: {
       .join("\n") || "(none yet)";
   let guides = "";
   for (const g of kb.filter((k) => k.type === "guide")) {
-    const s = `### ${g.title}\n${(g.body || "").slice(0, 2500)}\n`;
-    if ((guides + s).length > 20000) break;
+    const s = `### ${g.title}\n${(g.body || "").slice(0, 8000)}\n`;
+    if ((guides + s).length > 40000) break;
     guides += s;
   }
   const links =
